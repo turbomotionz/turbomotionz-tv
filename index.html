@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TurboMotionZ TV</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  #player { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+</style>
+</head>
+<body>
+<div id="player"></div>
+<script>
+  // TurboMotionZ TV, for the lobby TV in Slots With Friends (2026-10-27). YouTube won't play its
+  // player straight in the game's browser (Error 153: it has to sit on a real web page), so the
+  // game shows this page instead. It plays the channel's videos muted, in random order, round and
+  // round, with no controls or captions, and skips any video that won't play. It uses YouTube's
+  // free player: no key, nothing to pay.
+  //
+  // Which videos: add ?list=videos (the default: regular videos), ?list=shorts, ?list=all, or any
+  // playlist id (?list=PL...) to the page's address.
+  const CHANNEL = "NyjK5ytmTXe9rIQPpPONFA"; // TurboMotionZ (the channel id is UC + this)
+  const LISTS = { videos: "UULF", shorts: "UUSH", all: "UU" };
+  const want = new URLSearchParams(location.search).get("list") || "videos";
+  const playlist = LISTS[want] ? LISTS[want] + CHANNEL : want;
+
+  let player, skips = 0;
+
+  function onYouTubeIframeAPIReady() {
+    player = new YT.Player("player", {
+      playerVars: {
+        listType: "playlist", list: playlist, autoplay: 1, mute: 1, loop: 1,
+        controls: 0, disablekb: 1, fs: 0, rel: 0, iv_load_policy: 3, cc_load_policy: 0, playsinline: 1,
+      },
+      events: {
+        onReady: (e) => { e.target.mute(); shuffleAndPlay(); },
+        onStateChange: (e) => {
+          // Muted and no captions, whatever the player remembers
+          if (!e.target.isMuted()) e.target.mute();
+          if (e.data === YT.PlayerState.PLAYING) {
+            skips = 0;
+            try { e.target.unloadModule("captions"); } catch (_) {}
+          }
+        },
+        // A video that can't play here (private, blocked, gone): on to the next
+        onError: () => { if (skips++ < 20) player.nextVideo(); },
+      },
+    });
+  }
+
+  // The playlist arrives a moment after the player: once it's there, shuffle it and start
+  function shuffleAndPlay(tries = 0) {
+    const ids = player.getPlaylist();
+    if (!ids || ids.length === 0) {
+      if (tries < 40) setTimeout(() => shuffleAndPlay(tries + 1), 250);
+      return;
+    }
+    player.setShuffle(true);
+    player.setLoop(true);
+    player.playVideoAt(0);
+  }
+</script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>
